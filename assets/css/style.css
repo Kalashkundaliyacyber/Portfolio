@@ -421,7 +421,7 @@ h6 {
 #hero {
   width: 100%;
   height: 100vh;
-  background: url("../img/photo3.jpg") top right;
+  background: url("../img/photo2.jpg") top right;
   background-size: cover;
   display: flex;
   flex-direction: column;
@@ -429,8 +429,8 @@ h6 {
 }
 
 #hero .container {
-  padding-top: 50px; /* Adjust as necessary */
-  padding-left: 250px;
+  padding-top: 350px; /* Adjust as necessary */
+  padding-right: 910px;
   position: relative;
   width: 100%;
   display: flex;

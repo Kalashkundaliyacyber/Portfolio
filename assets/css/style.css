@@ -423,24 +423,16 @@ h6 {
   height: 100vh;
   background: url("../img/photo1.jpg") top right;
   background-size: cover;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
 }
 
 #hero .container {
-  padding-top: 350px; /* Adjust as necessary */
-  padding-right: 910px;
+  padding-top: 70px;
   position: relative;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
 }
 
 @media (max-width: 992px) {
   #hero .container {
-    padding-top: 20px; /* Adjust as necessary */
+    padding-top: 58px;
   }
 }
 
@@ -449,11 +441,11 @@ h6 {
   font-size: 48px;
   font-weight: 700;
   line-height: 56px;
-  color: #ffffff;
+  color: #222222;
 }
 
 #hero h2 {
-  color: #f6fcfc;
+  color: #6f6f6f;
   margin: 10px 0 0 0;
   font-size: 22px;
 }
@@ -465,22 +457,17 @@ h6 {
   font-size: 12px;
   letter-spacing: 1px;
   display: inline-block;
-  padding: 12px 0; /* Vertical padding */
-  width: 150px; /* Fixed width */
-  text-align: center; /* Center text within button */
+  padding: 12px 40px;
   border-radius: 50px;
   transition: 0.5s;
   margin-top: 30px;
   color: #fff;
   background: #34b7a7;
-  margin-left: 0px; /* Adjust as necessary */
-  margin-right: 50px;
 }
 
 #hero .btn-about:hover {
   background: #3dc8b7;
 }
-
 
 @media (min-width: 1024px) {
   #hero {

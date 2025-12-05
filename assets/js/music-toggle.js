@@ -1,30 +1,36 @@
 // assets/js/music-toggle.js
 (() => {
+  // -------------------------
   // CONFIG - update if needed
-  const audioSrc = 'assets/music.mp3';      // path to your audio file (relative to site root)
-  const titleSelector = '#title, .site-title, header h1'; // legacy title selectors
-const excludedSelector = [
-  '#header',                       // header & navigation
-  '.portfolio-item',               // portfolio grid item
-  '.portfolio-wrap',               // portfolio wrapper
-  '.portfolio-info',               // portfolio overlay
-  '.portfolio-links',              // zoom / link icons
-  '.portfolio-lightbox',           // lightbox trigger
-  '.mobile-nav-toggle',            // mobile nav icon
-  '[aria-label="Close"]',          // any aria-label close button
-  '#portfolio-flters',             // filter bar container
-  '#portfolio-flters li',          // individual filter tab
-  '#portfolio-flters a',           // filter links
-  '[data-filter]',                 // any element using data-filter
-  '.row[data-aos]',                // the row wrapper for the filter bar
-].join(', ');
-  const volume = 0.6;                        // initial volume (0.0 - 1.0)
-  const showIndicator = true;                // set false to hide the on-screen indicator
+  // -------------------------
+  const audioSrc = 'assets/music.mp3';         // path to your audio file (relative to site root)
+  const ICON_PLAY_PATH = 'assets/pause.svg';  // shown when audio is paused (click to play)
+  const ICON_PAUSE_PATH = 'assets/resume.svg';  // shown when audio is playing (click to pause)
+  const titleSelector = '#title, .site-title, header h1';
 
-  // storage keys (sessionStorage used so it resets when browser session ends)
+  const excludedSelector = [
+    '#header',
+    '.portfolio-item',
+    '.portfolio-wrap',
+    '.portfolio-info',
+    '.portfolio-links',
+    '.portfolio-lightbox',
+    '.mobile-nav-toggle',
+    '[aria-label="Close"]',
+    '#portfolio-flters',
+    '#portfolio-flters li',
+    '#portfolio-flters a',
+    '[data-filter]',
+    '.row[data-aos]'
+  ].join(', ');
+
+  const volume = 0.6;
+  const showIndicator = true;
+
+  // storage keys
   const K_IS_PLAYING = 'bgmusic:isPlaying';
   const K_CURRENT_TIME = 'bgmusic:currentTime';
-  const K_HAS_USER_GESTURE = 'bgmusic:hasUserGesture'; // track that user interacted previously
+  const K_HAS_USER_GESTURE = 'bgmusic:hasUserGesture';
 
   // create audio element programmatically
   const audio = document.createElement('audio');
@@ -37,37 +43,62 @@ const excludedSelector = [
   audio.style.display = 'none';
   document.body.appendChild(audio);
 
-  // visual indicator (optional)
+  // Remove any existing indicator elements (cleanup old/duplicate scripts)
+  (function cleanupOldIndicators() {
+    const old = document.getElementById('music-indicator');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    const oldImg = document.getElementById('music-indicator-img');
+    if (oldImg && oldImg.parentNode) oldImg.parentNode.removeChild(oldImg);
+  })();
+
+  // visual indicator (SVG-only, left side)
   let indicator = null;
+  let indicatorImg = null;
+
   if (showIndicator) {
-    indicator = document.createElement('div');
+    indicator = document.createElement('button');
     indicator.id = 'music-indicator';
-    indicator.innerText = '🔈';
+    indicator.type = 'button';
+    indicator.setAttribute('aria-pressed', 'false');
+    indicator.setAttribute('aria-label', 'Toggle background music');
+
     Object.assign(indicator.style, {
       position: 'fixed',
-      right: '12px',
+      left: '12px',         // left side as requested
       bottom: '12px',
-      padding: '6px 8px',
+      padding: '6px',
       borderRadius: '10px',
       backdropFilter: 'blur(6px)',
       background: 'rgba(0,0,0,0.35)',
-      color: 'white',
-      fontSize: '18px',
+      border: 'none',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
       zIndex: 99999,
       cursor: 'pointer',
       userSelect: 'none'
     });
-    indicator.title = 'Music: paused (click anywhere to play)';
+
+    // Use an <img> to load SVGs (no emoji/text fallback)
+    indicatorImg = document.createElement('img');
+    indicatorImg.id = 'music-indicator-img';
+    indicatorImg.alt = 'Music control';
+    indicatorImg.style.width = '20px';
+    indicatorImg.style.height = '20px';
+    indicatorImg.style.display = 'block';
+    indicatorImg.style.pointerEvents = 'none';
+
+    indicator.appendChild(indicatorImg);
     document.body.appendChild(indicator);
 
-    // clicking indicator toggles music (stops propagation so header-ignore rules don't apply to it)
+    // stop clicks from bubbling to the document-level handler and toggle audio
     indicator.addEventListener('click', (e) => {
       e.stopPropagation();
       toggleAudio();
     });
   }
 
-  // Helper: check if an element is inside any selector's matched element(s)
+  // Helper: check if element is inside any matched selector element
   function isInsideSelector(target, selector) {
     if (!target || !selector) return false;
     const els = document.querySelectorAll(selector);
@@ -78,7 +109,6 @@ const excludedSelector = [
     return false;
   }
 
-  // Combined check: is the click inside title area OR the header (excluded) area?
   function isInsideExcludedAreas(target) {
     if (isInsideSelector(target, excludedSelector)) return true;
     if (isInsideSelector(target, titleSelector)) return true;
@@ -90,25 +120,20 @@ const excludedSelector = [
   let hasStartedOnce = false;
   let saveInterval = null;
 
-  // load saved state from sessionStorage
+  // load saved state
   function loadSavedState() {
     try {
       const savedPlaying = sessionStorage.getItem(K_IS_PLAYING);
       const savedTime = sessionStorage.getItem(K_CURRENT_TIME);
       const savedGesture = sessionStorage.getItem(K_HAS_USER_GESTURE);
-      if (savedGesture === '1') {
-        // user had interacted previously (in this browser session)
-        hasStartedOnce = true;
-      }
+      if (savedGesture === '1') hasStartedOnce = true;
       if (savedTime !== null) {
         const t = parseFloat(savedTime);
         if (!Number.isNaN(t) && isFinite(t)) {
-          // try to restore time (clamp)
           audio.currentTime = Math.max(0, Math.min(t, Math.max(0, audio.duration || t)));
         }
       }
       if (savedPlaying === '1') {
-        // attempt to start playing (may fail on some browsers)
         attemptPlayOnLoad();
       } else {
         updateIndicator(false);
@@ -118,18 +143,14 @@ const excludedSelector = [
     }
   }
 
-  // save current state
   function saveState() {
     try {
       sessionStorage.setItem(K_IS_PLAYING, isPlaying ? '1' : '0');
       sessionStorage.setItem(K_CURRENT_TIME, String(audio.currentTime || 0));
       if (hasStartedOnce) sessionStorage.setItem(K_HAS_USER_GESTURE, '1');
-    } catch (err) {
-      // storage may be unavailable in some privacy modes
-    }
+    } catch (err) {}
   }
 
-  // attempt to play on load (called after restoring time)
   async function attemptPlayOnLoad() {
     try {
       await audio.play();
@@ -138,22 +159,23 @@ const excludedSelector = [
       updateIndicator(true);
       schedulePeriodicSave();
     } catch (err) {
-      // Play may be blocked until a user gesture on this page.
-      // We'll listen for next user gesture and then try to resume.
-      console.warn('bgmusic: deferred autoplay (needs gesture):', err);
+      // autoplay blocked until user gesture
       updateIndicator(false);
     }
   }
 
-  // update small indicator
   function updateIndicator(playing) {
-    if (!indicator) return;
+    if (!indicator || !indicatorImg) return;
     if (playing) {
-      indicator.innerText = '🔊';
-      indicator.title = 'Music: playing (click anywhere to stop)';
+      indicatorImg.src = ICON_PAUSE_PATH;
+      indicator.title = 'Music: playing (click to pause)';
+      indicator.setAttribute('aria-pressed', 'true');
+      indicator.setAttribute('aria-label', 'Pause background music');
     } else {
-      indicator.innerText = '🔈';
-      indicator.title = 'Music: paused (click anywhere to play)';
+      indicatorImg.src = ICON_PLAY_PATH;
+      indicator.title = 'Music: paused (click to play)';
+      indicator.setAttribute('aria-pressed', 'false');
+      indicator.setAttribute('aria-label', 'Play background music');
     }
   }
 
@@ -167,6 +189,7 @@ const excludedSelector = [
       schedulePeriodicSave();
     } catch (err) {
       console.warn('Unable to play audio:', err);
+      updateIndicator(false);
     }
     saveState();
   }
@@ -180,25 +203,20 @@ const excludedSelector = [
   }
 
   function toggleAudio() {
-    if (isPlaying) {
-      pauseAudio();
-    } else {
-      playAudio();
-    }
+    if (isPlaying) pauseAudio();
+    else playAudio();
   }
 
-  // Periodically save currentTime so navigation keeps position accurate
   function schedulePeriodicSave() {
     clearPeriodicSave();
     saveInterval = setInterval(() => {
       try {
         sessionStorage.setItem(K_CURRENT_TIME, String(audio.currentTime || 0));
         sessionStorage.setItem(K_IS_PLAYING, isPlaying ? '1' : '0');
-      } catch (err) {
-        // ignore
-      }
-    }, 1000); // every second
+      } catch (err) {}
+    }, 1000);
   }
+
   function clearPeriodicSave() {
     if (saveInterval) {
       clearInterval(saveInterval);
@@ -206,29 +224,18 @@ const excludedSelector = [
     }
   }
 
-  // page-level click/touch handler
   function onUserInteraction(e) {
     const clickTarget = e.target;
+    if (isInsideExcludedAreas(clickTarget)) return;
 
-    // ignore interactions inside excluded areas
-    if (isInsideExcludedAreas(clickTarget)) {
-      return;
-    }
-
-    // If we haven't started yet and the click was outside excluded areas -> start
-    // (This user gesture sets hasStartedOnce so future pages can resume)
     if (!hasStartedOnce && !isInsideExcludedAreas(clickTarget)) {
       playAudio();
       return;
     }
 
-    // If audio already started earlier: toggle on each click/tap anywhere (outside excluded areas)
-    if (hasStartedOnce) {
-      toggleAudio();
-    }
+    if (hasStartedOnce) toggleAudio();
   }
 
-  // Keyboard accessibility: Space / Enter toggles (unless focus is inside input/textarea/contenteditable or excluded areas)
   function onKeyDown(e) {
     const active = document.activeElement;
     const isFormControl = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
@@ -240,7 +247,6 @@ const excludedSelector = [
     }
   }
 
-  // Save state before unloading (so other pages can read it)
   function onBeforeUnload() {
     try {
       sessionStorage.setItem(K_CURRENT_TIME, String(audio.currentTime || 0));
@@ -249,15 +255,12 @@ const excludedSelector = [
     } catch (err) {}
   }
 
-  // initialize listeners
   document.addEventListener('click', onUserInteraction, true);
   document.addEventListener('touchstart', onUserInteraction, { capture: true, passive: true });
   document.addEventListener('keydown', onKeyDown);
   window.addEventListener('beforeunload', onBeforeUnload);
 
-  // If audio metadata loads, clamp restored time properly
   audio.addEventListener('loadedmetadata', () => {
-    // If we have a saved time beyond duration, clamp to duration
     try {
       const savedTime = sessionStorage.getItem(K_CURRENT_TIME);
       if (savedTime !== null) {
@@ -266,25 +269,21 @@ const excludedSelector = [
           audio.currentTime = Math.max(0, Math.min(t, audio.duration || t));
         }
       }
-    } catch (err) {
-      // ignore
-    }
+    } catch (err) {}
   });
 
-  // Keep sessionStorage updated with currentTime when audio is playing (backup)
   audio.addEventListener('timeupdate', () => {
     try {
       if (isPlaying) sessionStorage.setItem(K_CURRENT_TIME, String(audio.currentTime || 0));
     } catch (err) {}
   });
 
-  // On load, attempt to restore saved state (position + play state)
-  // Wait for DOM content so excluded selectors exist
+  // On load, attempt restore state
   document.addEventListener('DOMContentLoaded', () => {
     loadSavedState();
   });
 
-  // Expose controls for debugging if needed
+  // Expose for debugging
   window.__bgMusic = {
     play: playAudio,
     pause: pauseAudio,

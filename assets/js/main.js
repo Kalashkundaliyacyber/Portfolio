@@ -291,7 +291,7 @@
   // assets/js/music-toggle.js
 (() => {
   // CONFIG - update if needed
-  const audioSrc = '/assets/music.mp3';      // path to your audio file (relative to site root)
+  const audioSrc = 'assets/music.mp3';      // path to your audio file (relative to site root)
   const titleSelector = '#title, .site-title, header h1'; // legacy title selectors
 const excludedSelector = [
   '#header',                       // header & navigation

@@ -3,13 +3,13 @@
 // and wheel/touch support for short/no-scroll pages.
 (() => {
   // CONFIG (tweakable)
-  const BOTTOM_THRESHOLD = 0.94;   // fraction (fraction of scrollable area) considered "bottom"
+  const BOTTOM_THRESHOLD = 0.994;   // fraction (fraction of scrollable area) considered "bottom"
   const TOP_THRESHOLD = 0.06;      // fraction considered "top"
   const NAV_DEBOUNCE_MS = 350;     // minimum ms between navigations
-  const HOLD_MS = 120;             // require staying at threshold for this long
+  const HOLD_MS = 420;             // require staying at threshold for this long
   const NAV_SELECTOR = '#navbar a';// collect nav links order from navbar
   const IGNORE_BODY_ATTR = 'data-scroll-nav'; // set data-scroll-nav="off" on <body> to disable
-  const WHEEL_DELTA_MIN = 28;      // minimum wheel delta threshold to count as intent
+  const WHEEL_DELTA_MIN = 36;      // minimum wheel delta threshold to count as intent
   const TOUCH_SWIPE_MIN = 80;      // min vertical px swipe to count as intent
 
   // Special: portfolio child pages that should route up->services and down->Contact

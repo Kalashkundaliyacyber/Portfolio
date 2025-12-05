@@ -110,6 +110,7 @@
   }
 
   function isInsideExcludedAreas(target) {
+    if (!target) return false;
     if (isInsideSelector(target, excludedSelector)) return true;
     if (isInsideSelector(target, titleSelector)) return true;
     return false;
@@ -224,16 +225,35 @@
     }
   }
 
+  // --- Improved user interaction handling (desktop + mobile) ---
+  // We'll keep click handling for desktop, but implement a touch tap-detection
+  // that treats short, low-movement touches as taps (so scrolling doesn't trigger).
+  let lastTouchTime = 0;
+  let ignoreNextClickUntil = 0;
+
   function onUserInteraction(e) {
-    const clickTarget = e.target;
+    // Guard: ignore click events that directly follow a touch (to avoid double-trigger).
+    if (e && e.type === 'click' && Date.now() < ignoreNextClickUntil) return;
+
+    const clickTarget = e && e.target ? e.target : document.activeElement;
+
+    // ignore form controls
+    const active = document.activeElement;
+    const isFormControl = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+    if (isFormControl) return;
+
     if (isInsideExcludedAreas(clickTarget)) return;
 
-    if (!hasStartedOnce && !isInsideExcludedAreas(clickTarget)) {
+    // If user never started audio before, first tap should start it (user gesture)
+    if (!hasStartedOnce) {
       playAudio();
+      lastTouchTime = Date.now();
       return;
     }
 
-    if (hasStartedOnce) toggleAudio();
+    // For subsequent gestures, toggle
+    toggleAudio();
+    lastTouchTime = Date.now();
   }
 
   function onKeyDown(e) {
@@ -241,7 +261,8 @@
     const isFormControl = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
     if (isFormControl) return;
 
-    if (e.code === 'Space' || e.code === 'Enter') {
+    // accept Space and Enter
+    if (e.code === 'Space' || e.code === 'Enter' || e.key === ' ') {
       if (isInsideExcludedAreas(active)) return;
       toggleAudio();
     }
@@ -255,8 +276,74 @@
     } catch (err) {}
   }
 
+  // Desktop click listener (capture true to run early). We will respect ignoreNextClickUntil.
   document.addEventListener('click', onUserInteraction, true);
-  document.addEventListener('touchstart', onUserInteraction, { capture: true, passive: true });
+
+  // --- TOUCH TAP detection: distinguish tap vs scroll ---
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchStartTime = 0;
+  let touchMoved = false;
+  let touchStartTarget = null;
+
+  function onTouchStart(e) {
+    if (!e || !e.touches || e.touches.length > 1) {
+      touchMoved = true;
+      return;
+    }
+    const t = e.touches[0];
+    touchStartX = t.clientX;
+    touchStartY = t.clientY;
+    touchStartTime = Date.now();
+    touchMoved = false;
+    touchStartTarget = e.target;
+  }
+
+  function onTouchMove(e) {
+    if (!e || !e.touches || touchMoved) return;
+    const t = e.touches[0];
+    const dx = Math.abs(t.clientX - touchStartX);
+    const dy = Math.abs(t.clientY - touchStartY);
+    // if user moved more than 10px, consider it a scroll/drag
+    if (dx > 10 || dy > 10) touchMoved = true;
+  }
+
+  function onTouchEnd(e) {
+    const now = Date.now();
+    // If we recorded movement or if touch was long, do nothing (it's likely a scroll or long-press)
+    const duration = now - (touchStartTime || now);
+    if (touchMoved) return;
+    if (duration > 500) return; // too long to be a simple tap
+
+    // Determine target: prefer touchStartTarget, fallback to event target
+    const target = touchStartTarget || (e && e.target) || document.activeElement;
+
+    // Ignore if inside excluded areas or if user is focused on form control
+    const active = document.activeElement;
+    const isFormControl = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+    if (isFormControl) return;
+    if (isInsideExcludedAreas(target)) return;
+
+    // Mark that a touch happened so the following click is ignored
+    ignoreNextClickUntil = Date.now() + 700;
+
+    // Construct a synthetic event-like object and call the main handler
+    const syntheticEvent = { type: 'touchend', target: target };
+    if (!hasStartedOnce) {
+      // first user gesture should attempt to play
+      playAudio();
+    } else {
+      toggleAudio();
+    }
+    lastTouchTime = Date.now();
+  }
+
+  // Use passive listeners for performance, but we are not calling preventDefault()
+  document.addEventListener('touchstart', onTouchStart, { passive: true, capture: true });
+  document.addEventListener('touchmove', onTouchMove, { passive: true, capture: true });
+  document.addEventListener('touchend', onTouchEnd, { passive: true, capture: true });
+
+  // Key and unload listeners
   document.addEventListener('keydown', onKeyDown);
   window.addEventListener('beforeunload', onBeforeUnload);
 

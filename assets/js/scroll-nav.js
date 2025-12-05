@@ -10,7 +10,7 @@
   const NAV_SELECTOR = '#navbar a';// collect nav links order from navbar
   const IGNORE_BODY_ATTR = 'data-scroll-nav'; // set data-scroll-nav="off" on <body> to disable
   const WHEEL_DELTA_MIN = 28;      // minimum wheel delta threshold to count as intent
-  const TOUCH_SWIPE_MIN = 50;      // min vertical px swipe to count as intent
+  const TOUCH_SWIPE_MIN = 80;      // min vertical px swipe to count as intent
 
   // Special: portfolio child pages that should route up->services and down->Contact
   // Use the actual filenames/last path segments of your child pages here if they differ.
@@ -304,47 +304,83 @@
     };
   }
 
-  // TOUCH handlers for mobile swipes (for no-scroll pages or for fast navigation)
-  function setupTouchHandlers(pages, curIndexGetter) {
-    document.addEventListener('touchstart', (e) => {
-      if (!enabled || pageDisabled()) return;
-      if (!e.touches || e.touches.length === 0) return;
-      touchStartY = e.touches[0].clientY;
-    }, { passive: true });
+// TOUCH handlers for mobile swipes (for no-scroll pages or for fast navigation)
+function setupTouchHandlers(pages, curIndexGetter) {
+  document.addEventListener('touchstart', (e) => {
+    if (!enabled || pageDisabled()) return;
+    if (!e.touches || e.touches.length === 0) return;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
 
-    document.addEventListener('touchend', (e) => {
-      if (!enabled || pageDisabled()) return;
-      if (touchStartY === null) return;
-      const touch = (e.changedTouches && e.changedTouches[0]) || null;
-      if (!touch) { touchStartY = null; return; }
-      const dy = touchStartY - touch.clientY; // positive = swipe up (want next page)
-      touchStartY = null;
+  document.addEventListener('touchmove', (e) => {
+    // keep touchStartY current if user keeps touching; nothing special here,
+    // but cancel any pending hold so accidental holds don't trigger.
+    cancelHold();
+  }, { passive: true });
 
-      if (Math.abs(dy) < TOUCH_SWIPE_MIN) return;
+  document.addEventListener('touchend', (e) => {
+    if (!enabled || pageDisabled()) return;
+    if (touchStartY === null) return;
+    const touch = (e.changedTouches && e.changedTouches[0]) || null;
+    if (!touch) { touchStartY = null; return; }
+    const dy = touchStartY - touch.clientY; // positive = swipe up (want next page)
+    touchStartY = null;
 
-      const curIndex = curIndexGetter();
-      const curName = getCurrentPageName();
-      if (isPortfolioChild(curName)) {
-        const special = getSpecialHrefsForPortfolioChild(pages);
+    // require a reasonably large vertical movement to count as a swipe
+    if (Math.abs(dy) < TOUCH_SWIPE_MIN) return;
+
+    // compute fraction to determine if we're near top/bottom (consistent with scroll/wheel logic)
+    const { fraction, y, docH, winH, scrollable } = computeFraction();
+    const noScrollPage = (docH <= winH + 2);
+    const nearBottom = (fraction >= BOTTOM_THRESHOLD);
+    const nearTop = (fraction <= TOP_THRESHOLD);
+
+    const curIndex = curIndexGetter();
+    const curName = getCurrentPageName();
+
+    // Special portfolio child pages: map up/down to Persona/Contact
+    if (isPortfolioChild(curName)) {
+      const special = getSpecialHrefsForPortfolioChild(pages);
+
+      // if page is not scrollable, immediate nav on swipe
+      if (noScrollPage) {
         if (dy > 0) {
-          // swipe up -> next (Contact)
           if (special.downHref) safeNavigate(special.downHref);
         } else {
-          // swipe down -> prev (services)
           if (special.upHref) safeNavigate(special.upHref);
         }
         return;
       }
 
+      // for scrollable pages only navigate if user is near top/bottom
+      if (dy > 0 && nearBottom && special.downHref) {
+        safeNavigate(special.downHref);
+      } else if (dy < 0 && nearTop && special.upHref) {
+        safeNavigate(special.upHref);
+      }
+      return;
+    }
+
+    // Normal pages:
+    if (noScrollPage) {
+      // immediate navigation on intent for no-scroll pages
       if (dy > 0) {
-        // swipe up -> next
-        if (curIndex >= 0 && curIndex < pages.length - 1) safeNavigate(pages[curIndex + 1]);
+        if (curIndex < pages.length - 1) safeNavigate(pages[curIndex + 1]);
       } else {
-        // swipe down -> prev
         if (curIndex > 0) safeNavigate(pages[curIndex - 1]);
       }
-    }, { passive: true });
-  }
+      return;
+    }
+
+    // For scrollable pages: only navigate on swipe if near top/bottom
+    if (dy > 0 && nearBottom && curIndex < pages.length - 1) {
+      safeNavigate(pages[curIndex + 1]);
+    } else if (dy < 0 && nearTop && curIndex > 0) {
+      safeNavigate(pages[curIndex - 1]);
+    }
+  }, { passive: true });
+}
+
 
   // Keyboard toggle for testing
   function setupKeyboardToggle() {

@@ -3,7 +3,7 @@
   // -------------------------
   // CONFIG - update if needed
   // -------------------------
-  const audioSrc = 'assets/music.mp3';         // path to your audio file (relative to site root)
+  const audioSrc = 'assets/music2.mp3';         // path to your audio file (relative to site root)
   const ICON_PLAY_PATH = 'assets/pause.svg';  // shown when audio is paused (click to play)
   const ICON_PAUSE_PATH = 'assets/resume.svg';  // shown when audio is playing (click to pause)
   const titleSelector = '#title, .site-title, header h1';

@@ -9,6 +9,7 @@
   const titleSelector = '#title, .site-title, header h1';
 
   const excludedSelector = [
+    
     '#header',
     '.portfolio-item',
     '.portfolio-wrap',
